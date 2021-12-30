@@ -54,6 +54,7 @@ class Choice extends Constraint
     public function __construct(
         string|array $choices = null,
         callable|string $callback = null,
+        string $enum = null,
         bool $multiple = null,
         bool $strict = null,
         int $min = null,
@@ -75,6 +76,7 @@ class Choice extends Constraint
         parent::__construct($options, $groups, $payload);
 
         $this->callback = $callback ?? $this->callback;
+        $this->enum = $enum ?? $this->enum;
         $this->multiple = $multiple ?? $this->multiple;
         $this->strict = $strict ?? $this->strict;
         $this->min = $min ?? $this->min;

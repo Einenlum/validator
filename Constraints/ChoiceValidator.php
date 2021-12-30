@@ -35,8 +35,12 @@ class ChoiceValidator extends ConstraintValidator
             throw new UnexpectedTypeException($constraint, Choice::class);
         }
 
-        if (!\is_array($constraint->choices) && !$constraint->callback) {
-            throw new ConstraintDefinitionException('Either "choices" or "callback" must be specified on constraint Choice.');
+        if (
+            !\is_array($constraint->choices)
+            && !$constraint->callback
+            && !$constraint->enum
+        ) {
+            throw new ConstraintDefinitionException('Either "choices", "enum" or "callback" must be specified on constraint Choice.');
         }
 
         if (null === $value) {
@@ -47,17 +51,7 @@ class ChoiceValidator extends ConstraintValidator
             throw new UnexpectedValueException($value, 'array');
         }
 
-        if ($constraint->callback) {
-            if (!\is_callable($choices = [$this->context->getObject(), $constraint->callback])
-                && !\is_callable($choices = [$this->context->getClassName(), $constraint->callback])
-                && !\is_callable($choices = $constraint->callback)
-            ) {
-                throw new ConstraintDefinitionException('The Choice constraint expects a valid callback.');
-            }
-            $choices = $choices();
-        } else {
-            $choices = $constraint->choices;
-        }
+        $choices = $this->getChoices($constraint);
 
         if (true !== $constraint->strict) {
             throw new \RuntimeException('The "strict" option of the Choice constraint should not be used.');
@@ -105,5 +99,33 @@ class ChoiceValidator extends ConstraintValidator
                 ->setCode(Choice::NO_SUCH_CHOICE_ERROR)
                 ->addViolation();
         }
+    }
+
+    private function getChoices(Choice $constraint): array|callback
+    {
+        if ($constraint->callback) {
+            if (!\is_callable($choices = [$this->context->getObject(), $constraint->callback])
+                && !\is_callable($choices = [$this->context->getClassName(), $constraint->callback])
+                && !\is_callable($choices = $constraint->callback)
+            ) {
+                throw new ConstraintDefinitionException('The Choice constraint expects a valid callback.');
+            }
+            return $choices();
+        }
+
+        if ($constraint->enum) {
+            if (!enum_exists($constraint->enum)) {
+                throw new ConstraintDefinitionException(sprintf('The enum parameter "%s" is not a valid enum'));
+            }
+
+            $reflectionEnum = new \ReflectionEnum($constraint->enum);
+            if (!$reflectionEnum->isBacked()) {
+                throw new ConstraintDefinitionException('The enum option requires a backed enum');
+            }
+
+            return array_map(fn(\BackedEnum $enum) => $enum->value, $constraint->enum::cases());
+        }
+
+        $choices = $constraint->choices;
     }
 }

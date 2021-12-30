@@ -16,6 +16,9 @@ use Symfony\Component\Validator\Constraints\ChoiceValidator;
 use Symfony\Component\Validator\Exception\ConstraintDefinitionException;
 use Symfony\Component\Validator\Exception\UnexpectedValueException;
 use Symfony\Component\Validator\Test\ConstraintValidatorTestCase;
+use Symfony\Component\Validator\Tests\Fixtures\BackedIntEnum;
+use Symfony\Component\Validator\Tests\Fixtures\BackedStringEnum;
+use Symfony\Component\Validator\Tests\Fixtures\NonBackedEnum;
 
 function choice_callback()
 {
@@ -62,7 +65,7 @@ class ChoiceValidatorTest extends ConstraintValidatorTestCase
         $this->assertNoViolation();
     }
 
-    public function testChoicesOrCallbackExpected()
+    public function testChoicesCallbackOrEnumExpected()
     {
         $this->expectException(ConstraintDefinitionException::class);
         $this->validator->validate('foobar', new Choice());
@@ -72,6 +75,18 @@ class ChoiceValidatorTest extends ConstraintValidatorTestCase
     {
         $this->expectException(ConstraintDefinitionException::class);
         $this->validator->validate('foobar', new Choice(['callback' => 'abcd']));
+    }
+
+    public function testEnumExpected()
+    {
+        $this->expectException(ConstraintDefinitionException::class);
+        $this->validator->validate('foobar', new Choice(['enum' => NonBackedEnum::class]));
+    }
+
+    public function testBackedEnumExpected()
+    {
+        $this->expectException(ConstraintDefinitionException::class);
+        $this->validator->validate('foobar', new Choice(['enum' => NonBackedEnum::class]));
     }
 
     /**
@@ -180,6 +195,42 @@ class ChoiceValidatorTest extends ConstraintValidatorTestCase
     {
         yield 'Doctrine style' => [new Choice(['choices' => ['foo', 'bar'], 'message' => 'myMessage'])];
         yield 'named arguments' => [new Choice(choices: ['foo', 'bar'], message: 'myMessage')];
+    }
+
+    public function testValidIntEnum(Choice $constraint)
+    {
+        $this->validator->validate(1, new Choice(['enum' => BackedIntEnum::class]));
+
+        $this->assertNoViolation();
+    }
+
+    public function testInvalidIntEnum(Choice $constraint)
+    {
+        $this->validator->validate(28, new Choice(['enum' => BackedIntEnum::class, 'message' => 'myMessage']));
+
+        $this->buildViolation('myMessage')
+            ->setParameter('{{ value }}', '28')
+            ->setParameter('{{ choices }}', '1, 2')
+            ->setCode(Choice::NO_SUCH_CHOICE_ERROR)
+            ->assertRaised();
+    }
+
+    public function testValidStringEnum(Choice $constraint)
+    {
+        $this->validator->validate('foo', new Choice(['enum' => BackedStringEnum::class]));
+
+        $this->assertNoViolation();
+    }
+
+    public function testInvalidStringEnum(Choice $constraint)
+    {
+        $this->validator->validate('baz', new Choice(['enum' => BackedStringEnum::class, 'message' => 'myMessage']));
+
+        $this->buildViolation('myMessage')
+            ->setParameter('{{ value }}', '"baz"')
+            ->setParameter('{{ choices }}', '"foo", "bar"')
+            ->setCode(Choice::NO_SUCH_CHOICE_ERROR)
+            ->assertRaised();
     }
 
     public function testInvalidChoiceEmptyChoices()
